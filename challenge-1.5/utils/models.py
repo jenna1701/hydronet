@@ -201,8 +201,7 @@ class SchNet(nn.Module):
         batch = batch.view(-1)
         out = scatter_add(h, batch, dim=0, dim_size=self.batch_size).view(-1)
 
-        if not self.training:
-            return out
+        return out
 
 
     @staticmethod
