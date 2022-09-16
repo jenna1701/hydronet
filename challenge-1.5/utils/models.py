@@ -29,7 +29,6 @@ def load_model(args, model_cat, mode='eval', device='cpu', frozen=False):
 
     return net
 
-# DONT CHANGE THIS ONE
 def load_pretrained_model(args, model_cat='', device='cpu', frozen=False):
     """
     Load single SchNet model
@@ -201,8 +200,8 @@ class SchNet(nn.Module):
         batch = batch.view(-1)
         out = scatter_add(h, batch, dim=0, dim_size=self.batch_size).view(-1)
 
-        if not self.training:
-            return out
+        return out
+        
 
 
     @staticmethod
