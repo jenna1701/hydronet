@@ -84,9 +84,15 @@ early_stopping = hooks.EarlyStopping(patience=10, verbose=True,
                                      path = os.path.join(args.savedir, 'best_model.pt'),
                                      trace_func=logging.info)
 
+total_epochs=0
 for i in range(args.n_epochs):
-    train_loss, train_e_loss, train_f_loss = train.train_energy_forces(args, net, train_loader, optimizer, args.energy_coeff, device, args.coefficient)
-    val_loss = train.get_pred_loss(args, net, val_loader, optimizer, args.energy_coeff, device, args.coefficient)
+
+    if args.energy_coeff ==1:
+        train_loss = train.train_energy_only(args, net, train_loader, optimizer, args.energy_coeff, device)
+        val_loss = train.get_pred_eloss(args, net, val_loader, optimizer, args.energy_coeff, device)
+    else:
+        train_loss, train_e_loss, train_f_loss = train.train_energy_forces(args, net, train_loader, optimizer, args.energy_coeff, device, args.coefficient)
+        val_loss = train.get_pred_loss(args, net, val_loader, optimizer, args.energy_coeff, device, args.coefficient)
 
     scheduler.step(val_loss)
     
@@ -95,7 +101,8 @@ for i in range(args.n_epochs):
     writer.add_scalar(f'learning_rate', optimizer.param_groups[0]["lr"], total_epochs)
     
     # write loss contributions for training loss
-    writer.add_scalars('training_loss_contributions', {'energy':train_e_loss,'forces':train_f_loss}, total_epochs)
+    if args.energy_coeff !=1:
+        writer.add_scalars('training_loss_contributions', {'energy':train_e_loss,'forces':train_f_loss}, total_epochs)
     
     total_epochs+=1
     

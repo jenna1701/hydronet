@@ -1,7 +1,9 @@
 import os 
+import logging
 import torch
 import numpy as np
 import pickle
+import torch.nn.functional as F
 from scipy.special import erfinv
 
 def percent_error(actual, pred, c=1e-6):
@@ -93,6 +95,29 @@ def energy_forces_loss(args, data, p_energies, p_forces, energy_coeff, c):
         raise(NotImplementedError(f'Loss funciton tag "{loss_fn}" not implemented'))
         
 
+def train_energy_only(args, model, loader, optimizer, energy_coeff, device, clip_value=150):
+    """
+    Loop over batches and train model
+    return: batch-averaged loss over the entire training epoch
+    """
+    model.train()
+    total_e_loss = []
+
+    for data in loader:
+        data = data.to(device)
+        e = model(data)
+        e_loss = F.mse_loss(e.view(-1), data.y.view(-1), reduction="sum")
+
+        with torch.no_grad():
+            total_e_loss.append(e_loss.item())
+
+        e_loss.backward()
+        optimizer.step()
+
+    ave_e_loss = sum(total_e_loss)/len(total_e_loss)
+    return ave_e_loss
+
+
 def train_energy_forces(args, model, loader, optimizer, energy_coeff, device, c, clip_value=150):
     """
     Loop over batches and train model
@@ -107,6 +132,7 @@ def train_energy_forces(args, model, loader, optimizer, energy_coeff, device, c,
         data.pos.requires_grad = True
         optimizer.zero_grad()
         e = model(data)
+        logging.info(e)
         f = torch.autograd.grad(e, data.pos, grad_outputs=torch.ones_like(e), retain_graph=True)[0]
 
         ef_loss, e_loss, f_loss = energy_forces_loss(args, data, e, f, energy_coeff, c)
@@ -223,3 +249,23 @@ def get_pred_loss(args, model, loader, optimizer, energy_coeff, device, c, val=F
     else:
         mae, stdvae = get_error_distribution(all_errs) #MAE and STD from EXAMINE SET
         return ave_ef_loss, mae, stdvae
+
+def get_pred_eloss(args, model, loader, optimizer, energy_coeff, device):
+    model.eval()
+    total_ef_loss = []
+    all_errs = []
+
+    for data in loader:
+        data = data.to(device)
+        data.pos.requires_grad = True
+        optimizer.zero_grad()
+
+        e = model(data)
+        e_loss = torch.mean(torch.square(data.y - e))
+
+        with torch.no_grad():
+            total_e_loss.append(e_loss.item())
+
+
+    ave_e_loss = sum(total_e_loss)/len(total_e_loss)
+    return ave_e_loss
