@@ -14,7 +14,7 @@
     "datasets": ["min", "nonmin"],
     "n_train": [2500, 2500],
     "n_to_examine": [1000, 1000],
-    "start_model": "./pretrained_models/2-7milweights",
+    "start_model": "./models/IPU-minima-best_model.pt",
     "load_state": false,
     "clip_value": 200.0,
     "loss_fn": "mse"
