@@ -1,0 +1,16 @@
+{
+    "create_splits": false,
+    "splitdir": "./data/splits/ipu_split/",
+    "datadir": "./data/cached_dataset/",
+    "energy_coeff": 1,
+    "n_epochs": 50,
+    "save_models": true,
+    "datasets": ["min"],
+    "start_model": "./models/IPU-minima-best_model.pt",
+    "load_state": false,
+    "clip_value": 200.0,
+    "start_lr": 0.001,
+    "coefficient": 0.000001, 
+    "model_cat": "ipu",
+    "loss_fn": "mse"
+}

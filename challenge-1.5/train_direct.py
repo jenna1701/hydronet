@@ -1,0 +1,108 @@
+# NEED TO: conda install tensorboard
+import os
+import torch
+import shutil
+import logging
+import json 
+import csv
+import argparse
+from torch.utils.tensorboard import SummaryWriter
+import sys
+
+from utils import data, models, train, eval, split, hooks
+
+# import path arguments
+parser = argparse.ArgumentParser()
+parser.add_argument('--savedir', type=str, required=True, help='Directory to save training results')
+parser.add_argument('--args', type=str, required=True, help='Path to training arguments')
+args = parser.parse_args()
+
+######## SET UP ########
+# create directory to store training results
+if not os.path.isdir(args.savedir):
+    os.mkdir(args.savedir)
+    os.mkdir(os.path.join(args.savedir,'tensorboard')) 
+else:
+    logging.warning(f'{args.savedir} is already a directory, either delete or choose new MODELDIR')
+    sys.exit()
+    
+# set up tensorboard logger
+writer = SummaryWriter(log_dir=os.path.join(args.savedir,'tensorboard'))
+
+# copy args file to training folder
+shutil.copy(args.args, os.path.join(args.savedir, 'args.json'))
+
+# read in args
+savedir = args.savedir
+with open(args.args) as f:
+    args_dict = json.load(f)
+    args = argparse.Namespace(**args_dict)
+args.savedir = savedir
+
+# check for GPU
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+logging.info(f'model will be trained on {device}')
+
+
+######## LOAD DATA ########
+# get initial train, val, examine splits for dataset(s)
+if args.create_splits:
+    logging.info('creating new split(s)')
+    # create split(s)
+    if not isinstance(args.datasets, list):
+        args.datasets = [args.datasets]
+    for dataset in args.datasets:
+        split.create_init_split(args.n_train_min, 0.005, 0.005, 
+                                args.n_to_examine_min, args.min_db_size, 
+                                dataset, savedir=args.savedir)
+else:
+    # copy initial split(s) to savedir
+    logging.info(f'starting from splits in {args.splitdir}')
+    if isinstance(args.datasets, list):
+        for dataset in args.datasets:
+            shutil.copy(os.path.join(args.splitdir, f'split_00_{dataset}.npz'), 
+                        os.path.join(args.savedir, f'split_00_{dataset}.npz'))
+    else: 
+        shutil.copy(os.path.join(args.splitdir, f'split_00_{args.datasets}.npz'), 
+                    os.path.join(args.savedir, f'split_00_{args.datasets}.npz'))
+
+# load datasets/dataloaders
+train_loader, val_loader, _ = data.init_dataloader(args)
+
+######## LOAD MODEL ########
+
+# load model
+net = models.load_model(args, args.model_cat, device=device)
+logging.info(f'model loaded from {args.start_model}')
+
+#initialize optimizer and LR scheduler
+optimizer = torch.optim.Adam(net.parameters(), lr=args.start_lr)
+scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=5, factor=0.8, min_lr=0.000001)
+
+# implement early stopping
+early_stopping = hooks.EarlyStopping(patience=10, verbose=True, 
+                                     path = os.path.join(args.savedir, 'best_model.pt'),
+                                     trace_func=logging.info)
+
+for i in range(args.n_epochs):
+    train_loss, train_e_loss, train_f_loss = train.train_energy_forces(args, net, train_loader, optimizer, args.energy_coeff, device, args.coefficient)
+    val_loss = train.get_pred_loss(args, net, val_loader, optimizer, args.energy_coeff, device, args.coefficient)
+
+    scheduler.step(val_loss)
+    
+    # log training info
+    writer.add_scalars('epoch_loss', {'train':train_loss,'val':val_loss}, total_epochs)
+    writer.add_scalar(f'learning_rate', optimizer.param_groups[0]["lr"], total_epochs)
+    
+    # write loss contributions for training loss
+    writer.add_scalars('training_loss_contributions', {'energy':train_e_loss,'forces':train_f_loss}, total_epochs)
+    
+    total_epochs+=1
+    
+    # check for stopping point
+    early_stopping(val_loss, net)
+    if early_stopping.early_stop:
+        break
+
+# close tensorboard logger
+writer.close()
