@@ -41,6 +41,7 @@ args.savedir = savedir
 
 # check for GPU
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
+print('torch available',torch.cuda.is_available())
 logging.info(f'model will be trained on {device}')
 
 
@@ -69,10 +70,13 @@ else:
 # load datasets/dataloaders
 train_loader, val_loader, _ = data.init_dataloader(args)
 
+    
 ######## LOAD MODEL ########
 
 # load model
-net = models.load_model(args, args.model_cat, device=device)
+net = models.load_model(args, args.model_cat, device='cpu')
+model = DataParallel(net)
+model = model.to(device)
 logging.info(f'model loaded from {args.start_model}')
 
 #initialize optimizer and LR scheduler
@@ -84,27 +88,17 @@ early_stopping = hooks.EarlyStopping(patience=10, verbose=True,
                                      path = os.path.join(args.savedir, 'best_model.pt'),
                                      trace_func=logging.info)
 
-total_epochs=0
-for i in range(args.n_epochs):
+for total_epochs in range(args.n_epochs):
 
-    if args.energy_coeff ==1:
-        train_loss = train.train_energy_only(args, net, train_loader, optimizer, args.energy_coeff, device)
-        val_loss = train.get_pred_eloss(args, net, val_loader, optimizer, args.energy_coeff, device)
-    else:
-        train_loss, train_e_loss, train_f_loss = train.train_energy_forces(args, net, train_loader, optimizer, args.energy_coeff, device, args.coefficient)
-        val_loss = train.get_pred_loss(args, net, val_loader, optimizer, args.energy_coeff, device, args.coefficient)
+
+    train_loss = train.train_energy_only(args, net, train_loader, optimizer, args.energy_coeff, device)
+    val_loss = train.get_pred_eloss(args, net, val_loader, optimizer, args.energy_coeff, device)
 
     scheduler.step(val_loss)
     
     # log training info
     writer.add_scalars('epoch_loss', {'train':train_loss,'val':val_loss}, total_epochs)
     writer.add_scalar(f'learning_rate', optimizer.param_groups[0]["lr"], total_epochs)
-    
-    # write loss contributions for training loss
-    if args.energy_coeff !=1:
-        writer.add_scalars('training_loss_contributions', {'energy':train_e_loss,'forces':train_f_loss}, total_epochs)
-    
-    total_epochs+=1
     
     # check for stopping point
     early_stopping(val_loss, net)

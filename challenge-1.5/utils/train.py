@@ -132,7 +132,6 @@ def train_energy_forces(args, model, loader, optimizer, energy_coeff, device, c,
         data.pos.requires_grad = True
         optimizer.zero_grad()
         e = model(data)
-        logging.info(e)
         f = torch.autograd.grad(e, data.pos, grad_outputs=torch.ones_like(e), retain_graph=True)[0]
 
         ef_loss, e_loss, f_loss = energy_forces_loss(args, data, e, f, energy_coeff, c)
@@ -252,8 +251,7 @@ def get_pred_loss(args, model, loader, optimizer, energy_coeff, device, c, val=F
 
 def get_pred_eloss(args, model, loader, optimizer, energy_coeff, device):
     model.eval()
-    total_ef_loss = []
-    all_errs = []
+    total_e_loss = []
 
     for data in loader:
         data = data.to(device)
