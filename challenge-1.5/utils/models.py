@@ -201,8 +201,6 @@ class SchNet(nn.Module):
         out = scatter_add(h, batch, dim=0, dim_size=self.batch_size).view(-1)
 
         return out
-        
-
 
     @staticmethod
     def loss(input, target):
