@@ -8,6 +8,7 @@
     "datadir": "./data/cached_dataset/",
     "energy_coeff": 1,
     "n_epochs": 5,
+    "batch_size": 128,
     "save_models": true,
     "datasets": ["min"],
     "start_model": "./models/IPU-minima-best_model.pt",

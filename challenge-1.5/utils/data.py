@@ -48,7 +48,6 @@ def dataloader(datasets,
 
 def init_dataloader(args, 
                     split = '00', 
-                    batch = 128,
                     shuffle=True):
     """
     Returns train, val, and list of examine loaders
@@ -70,9 +69,9 @@ def init_dataloader(args,
         val_data.append(dataset.load_data('val'))
         examine_data.append(dataset.load_data('examine'))
         
-    train_loader = DataListLoader(ConcatDataset(train_data), batch_size=batch, shuffle=shuffle)
-    val_loader = DataListLoader(ConcatDataset(val_data), batch_size=batch, shuffle=shuffle)
-    examine_loaders = [DataListLoader(ed, batch_size=batch, shuffle=shuffle) for ed in examine_data]
+    train_loader = DataListLoader(ConcatDataset(train_data), batch_size=args.batch_size, shuffle=shuffle)
+    val_loader = DataListLoader(ConcatDataset(val_data), batch_size=args.batch_size, shuffle=shuffle)
+    examine_loaders = [DataListLoader(ed, batch_size=args.batch_size, shuffle=shuffle) for ed in examine_data]
     
     return train_loader, val_loader, examine_loaders
 
