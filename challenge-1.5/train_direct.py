@@ -7,6 +7,7 @@ import json
 import csv
 import argparse
 from torch.utils.tensorboard import SummaryWriter
+from torch_geometric.nn import DataParallel
 import sys
 
 from utils import data, models, train, eval, split, hooks
@@ -74,9 +75,9 @@ train_loader, val_loader, _ = data.init_dataloader(args)
 ######## LOAD MODEL ########
 
 # load model
-net = models.load_model(args, args.model_cat, device='cpu')
+net = models.load_model(args, args.model_cat, device=device)
 model = DataParallel(net)
-model = model.to(device)
+#model = model.to(device)
 logging.info(f'model loaded from {args.start_model}')
 
 #initialize optimizer and LR scheduler
