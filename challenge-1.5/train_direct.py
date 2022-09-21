@@ -24,7 +24,7 @@ if not os.path.isdir(args.savedir):
     os.mkdir(args.savedir)
     os.mkdir(os.path.join(args.savedir,'tensorboard')) 
 else:
-    logging.warning(f'{args.savedir} is already a directory, either delete or choose new MODELDIR')
+    logging.warning(f'{args.savedir} is already a directory, either delete or choose new SAVEDIR')
     sys.exit()
     
 # set up tensorboard logger
@@ -54,9 +54,8 @@ if args.create_splits:
     if not isinstance(args.datasets, list):
         args.datasets = [args.datasets]
     for dataset in args.datasets:
-        split.create_init_split(args.n_train_min, 0.005, 0.005, 
-                                args.n_to_examine_min, args.min_db_size, 
-                                dataset, savedir=args.savedir)
+        #TODO only uses min cluster_path at the moment
+        split.create_init_split(args, dataset) 
 else:
     # copy initial split(s) to savedir
     logging.info(f'starting from splits in {args.splitdir}')

@@ -1,9 +1,13 @@
 {
-    "create_splits": false,
-    "splitdir": "./data/splits/ipu_split/",
+    "create_splits": true,
+    "cluster_path": "all_idx.npy",
+    "n_train": 100,
+    "n_val": 5000,
+    "n_examine": 5000,
+    "splitdir": "./data/splits/min_only/",
     "datadir": "./data/cached_dataset/",
     "energy_coeff": 1,
-    "n_epochs": 50,
+    "n_epochs": 5,
     "save_models": true,
     "datasets": ["min"],
     "start_model": "./models/IPU-minima-best_model.pt",
@@ -11,6 +15,6 @@
     "clip_value": 200.0,
     "start_lr": 0.001,
     "coefficient": 0.000001, 
-    "model_cat": "ipu",
+    "model_cat": "finetune",
     "loss_fn": "mse"
 }

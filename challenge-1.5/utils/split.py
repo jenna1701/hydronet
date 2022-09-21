@@ -29,7 +29,7 @@ def create_new_split(idx_to_add, n_to_examine, iteration, suffix, savedir='./'):
              test_idx=test_idx, add_idx=idx_to_add)
     
     
-def create_init_split(n_train, n_val, n_test, n_to_examine, num_clusters, suffix, savedir='./'):
+def create_init_split_al(n_train, n_val, n_test, n_to_examine, num_clusters, suffix, savedir='./'):
     """
     Function creates an initial split file with specified fractions of the dataset that should be
     assigned to the train, validation, test, and examine sets.
@@ -46,5 +46,19 @@ def create_init_split(n_train, n_val, n_test, n_to_examine, num_clusters, suffix
     np.savez(os.path.join(savedir, f'split_00_{suffix}.npz'), 
              train_idx=train_idx, examine_idx=examine_idx,
              reserve_idx=reserve_idx, val_idx=val_idx, 
+             test_idx=test_idx)
+
+def create_init_split(args, suffix):
+    #n_train, n_val, n_test, n_to_examine, suffix, cluster_path='all_idx.npy', savedir='./'):
+    cluster_list = np.load(args.cluster_path)
+    np.random.shuffle(cluster_list)
+    train_idx = cluster_list[0:args.n_train]
+    val_idx = cluster_list[args.n_train:(args.n_train+args.n_val)]
+    examine_idx = cluster_list[(args.n_train+args.n_val):(args.n_train+args.n_val+args.n_examine)]
+    test_idx = cluster_list[(args.n_train+args.n_val+args.n_examine):]
+    np.savez(os.path.join(args.savedir, f'split_00_{suffix}.npz'),
+             train_idx=train_idx, 
+             examine_idx=examine_idx,
+             val_idx=val_idx,
              test_idx=test_idx)
 
