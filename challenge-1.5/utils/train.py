@@ -65,22 +65,24 @@ def relative_gradient(data, p_energies, p_forces, energy_coeff, c):
     return total_loss, energies_loss, forces_loss
 
 
-def mse(data, p_energies, p_forces, energy_coeff):
+def mse(data, p_energies, p_forces, energy_coeff, device):
     """
     Compute the weighted MSE loss for the energies and forces of each batch.
     """
-    energies_loss = torch.mean(torch.square(data.y - p_energies))
-    forces_loss = torch.mean(torch.square(data.f - p_forces))
+    y = torch.cat([d.y for d in data]).to(device)
+    f = torch.cat([d.f for d in data]).to(device)
+    energies_loss = torch.mean(torch.square(y - p_energies))
+    forces_loss = torch.mean(torch.square(f - p_forces))
     total_loss = (energy_coeff)*energies_loss + (1-energy_coeff)*forces_loss
     return total_loss, energies_loss, forces_loss
 
 
-def energy_forces_loss(args, data, p_energies, p_forces, energy_coeff, c):
+def energy_forces_loss(args, data, p_energies, p_forces, energy_coeff, device):
     """
     Compute the weighted MSE loss for the energies and forces of each batch.
     """
     if args.loss_fn == "mse":
-        return mse(data, p_energies, p_forces, energy_coeff)
+        return mse(data, p_energies, p_forces, energy_coeff, device)
 
     elif args.loss_fn == "relative":
         return relative(data, p_energies, p_forces, energy_coeff, c)
@@ -104,9 +106,10 @@ def train_energy_only(args, model, loader, optimizer, energy_coeff, device, clip
     total_e_loss = []
 
     for data in loader:
-        data = data.to(device)
+        #data = data.to(device)
         e = model(data)
-        e_loss = F.mse_loss(e.view(-1), data.y.view(-1), reduction="sum")
+        y = torch.cat([d.y for d in data]).to(e.device)
+        e_loss = F.mse_loss(e.view(-1), y.view(-1), reduction="sum")
 
         with torch.no_grad():
             total_e_loss.append(e_loss.item())
@@ -128,14 +131,14 @@ def train_energy_forces(args, model, loader, optimizer, energy_coeff, device, c,
     total_e_loss, total_f_loss = [], []
 
     for data in loader:
-        data = data.to(device)
+        #data = data.to(device)
         data.pos.requires_grad = True
         optimizer.zero_grad()
         e = model(data)
         f = torch.autograd.grad(e, data.pos, grad_outputs=torch.ones_like(e), retain_graph=True)[0]
 
-        ef_loss, e_loss, f_loss = energy_forces_loss(args, data, e, f, energy_coeff, c)
-        
+        ef_loss, e_loss, f_loss = energy_forces_loss(args, data, e, f, energy_coeff, e.device)
+
         with torch.no_grad():
             total_ef_loss.append(ef_loss.item())
             total_e_loss.append(e_loss.item())
@@ -173,7 +176,7 @@ def get_idx_to_add(net, examine_loader, optimizer,
     net.eval()
     all_errs = []
     for data in examine_loader:
-        data = data.to(device)
+        #data = data.to(device)
         data.pos.requires_grad = True
         optimizer.zero_grad()
 
@@ -216,14 +219,14 @@ def get_pred_loss(args, model, loader, optimizer, energy_coeff, device, c, val=F
     all_errs = []
     
     for data in loader:
-        data = data.to(device)
+        #data = data.to(device)
         data.pos.requires_grad = True
         optimizer.zero_grad()
 
         e = model(data)
         f = torch.autograd.grad(e, data.pos, grad_outputs=torch.ones_like(e), retain_graph=False)[0]
 
-        ef_loss, e_loss, f_loss = energy_forces_loss(args, data, e, f, energy_coeff, c)
+        ef_loss, e_loss, f_loss = energy_forces_loss(args, data, e, f, energy_coeff, e.device)
         with torch.no_grad():
             total_ef_loss.append(ef_loss.item())
         if val == True:
@@ -254,12 +257,13 @@ def get_pred_eloss(args, model, loader, optimizer, energy_coeff, device):
     total_e_loss = []
 
     for data in loader:
-        data = data.to(device)
-        data.pos.requires_grad = True
+        #data = data.to(device)
+        #data.pos.requires_grad = True
         optimizer.zero_grad()
 
         e = model(data)
-        e_loss = torch.mean(torch.square(data.y - e))
+        y = torch.cat([d.y for d in data]).to(e.device)
+        e_loss = torch.mean(torch.square(y - e))
 
         with torch.no_grad():
             total_e_loss.append(e_loss.item())
