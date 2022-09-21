@@ -76,7 +76,7 @@ train_loader, val_loader, _ = data.init_dataloader(args)
 
 # load model
 net = models.load_model(args, args.model_cat, device=device)
-model = DataParallel(net)
+net = DataParallel(net)
 #model = model.to(device)
 logging.info(f'model loaded from {args.start_model}')
 
