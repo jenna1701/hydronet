@@ -1,6 +1,6 @@
 import os
 import os.path as op
-from torch_geometric.data import DataLoader
+from torch_geometric.data import DataListLoader, DataLoader
 from torch.utils.data import ConcatDataset
 from utils.water_dataset import PrepackedDataset, gc_WaterDataSet
 
@@ -9,7 +9,7 @@ import sys
 def dataloader(datasets,
                mode,
                split = '00', 
-               batch = 256,
+               batch = 128,
                shuffle=True,
                splitdir = './data/splits/',
                datadir = './data/cached_dataset/'
@@ -29,7 +29,7 @@ def dataloader(datasets,
             data.append(dataset.load_data(mode))
         
         batch_size = batch if len(data) > batch else len(data)
-        loader = DataLoader(ConcatDataset(data), batch_size=batch_size, shuffle=shuffle)
+        loader = DataListLoader(ConcatDataset(data), batch_size=batch_size, shuffle=shuffle)
         
     else:
         dataset = PrepackedDataset(None, 
@@ -41,14 +41,14 @@ def dataloader(datasets,
         print(f'{datasets} data loaded from {datadir}')
 
         batch_size = batch if len(data) > batch else len(data)
-        loader = DataLoader(data, batch_size=batch_size, shuffle=shuffle)
+        loader = DataListLoader(data, batch_size=batch_size, shuffle=shuffle)
 
     return loader
 
 
 def init_dataloader(args, 
                     split = '00', 
-                    batch = 256,
+                    batch = 128,
                     shuffle=True):
     """
     Returns train, val, and list of examine loaders
@@ -70,9 +70,9 @@ def init_dataloader(args,
         val_data.append(dataset.load_data('val'))
         examine_data.append(dataset.load_data('examine'))
         
-    train_loader = DataLoader(ConcatDataset(train_data), batch_size=batch, shuffle=shuffle)
-    val_loader = DataLoader(ConcatDataset(val_data), batch_size=batch, shuffle=shuffle)
-    examine_loaders = [DataLoader(ed, batch_size=batch, shuffle=shuffle) for ed in examine_data]
+    train_loader = DataListLoader(ConcatDataset(train_data), batch_size=batch, shuffle=shuffle)
+    val_loader = DataListLoader(ConcatDataset(val_data), batch_size=batch, shuffle=shuffle)
+    examine_loaders = [DataListLoader(ed, batch_size=batch, shuffle=shuffle) for ed in examine_data]
     
     return train_loader, val_loader, examine_loaders
 

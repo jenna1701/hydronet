@@ -11,7 +11,7 @@ import os
 from copy import deepcopy as copy
 from pathlib import Path
 from tqdm import tqdm
-from torch_geometric.data import DataLoader, InMemoryDataset, Data, extract_zip, download_url
+from torch_geometric.data import DataListLoader, DataLoader, InMemoryDataset, Data, extract_zip, download_url
 import h5py
 import logging
 
@@ -112,7 +112,9 @@ class PrepackedDataset(torch.utils.data.Dataset):
         return self.x[index], self.z[index], self.pos[index], self.y[index], self.f[index], self.size[index]
 
     def get_dataloader(self, options):
-        return DataLoader(data, batch_size=1, shuffle=self.shuffle)
+        # use DataListLoader with DataParallel
+        return DataListLoader(data, batch_size=1, shuffle=self.shuffle)
+        #return DataLoader(data, batch_size=1, shuffle=self.shuffle)
 
     
 class WaterDataSet(InMemoryDataset):
