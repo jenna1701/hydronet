@@ -52,6 +52,7 @@ def init_dataloader(args,
     """
     Returns train, val, and list of examine loaders
     """
+    pin_memory = False if args.train_forces else True
 
     if not isinstance(args.datasets, list):
         args.datasets = [args.datasets]
@@ -69,9 +70,9 @@ def init_dataloader(args,
         val_data.append(dataset.load_data('val'))
         examine_data.append(dataset.load_data('examine'))
         
-    train_loader = DataListLoader(ConcatDataset(train_data), batch_size=args.batch_size, shuffle=shuffle, num_workers=4, pin_memory=True)
-    val_loader = DataListLoader(ConcatDataset(val_data), batch_size=args.batch_size, shuffle=shuffle, num_workers=4, pin_memory=True)
-    examine_loaders = [DataListLoader(ed, batch_size=args.batch_size, shuffle=shuffle, num_workers=4, pin_memory=True) for ed in examine_data]
+    train_loader = DataListLoader(ConcatDataset(train_data), batch_size=args.batch_size, shuffle=shuffle, num_workers=4, pin_memory=pin_memory)
+    val_loader = DataListLoader(ConcatDataset(val_data), batch_size=args.batch_size, shuffle=shuffle, num_workers=4, pin_memory=pin_memory)
+    examine_loaders = [DataListLoader(ed, batch_size=args.batch_size, shuffle=shuffle, num_workers=4, pin_memory=pin_memory) for ed in examine_data]
     
     return train_loader, val_loader, examine_loaders
 
