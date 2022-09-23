@@ -97,6 +97,7 @@ class PrepackedDataset(torch.utils.data.Dataset):
             z = torch.from_numpy(dataset["z"][index][:cluster_size*3])
             x = torch.from_numpy(dataset["x"][index][:cluster_size*3])
             pos = torch.from_numpy(dataset["pos"][index][:cluster_size*3])
+            pos.requires_grad = True
             y = torch.from_numpy(dataset["y"][index])
             f = torch.from_numpy(dataset["f"][index][:cluster_size*3])
             size = torch.from_numpy(dataset["size"][index])

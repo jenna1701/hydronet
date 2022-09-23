@@ -4,6 +4,9 @@ import torch
 import numpy as np
 import pickle
 import torch.nn.functional as F
+from torch_geometric.nn import DataParallel
+from torch.utils.data import ConcatDataset
+from torch_geometric.data import DataListLoader, DataLoader
 from scipy.special import erfinv
 
 def percent_error(actual, pred, c=1e-6):
@@ -106,7 +109,6 @@ def train_energy_only(args, model, loader, optimizer, energy_coeff, device, clip
     total_e_loss = []
 
     for data in loader:
-        #data = data.to(device)
         e = model(data)
         y = torch.cat([d.y for d in data]).to(e.device)
         e_loss = F.mse_loss(e.view(-1), y.view(-1), reduction="sum")
@@ -121,7 +123,7 @@ def train_energy_only(args, model, loader, optimizer, energy_coeff, device, clip
     return ave_e_loss
 
 
-def train_energy_forces(args, model, loader, optimizer, energy_coeff, device, c, clip_value=150):
+def train_energy_forces_slow(args, model, loader, optimizer, energy_coeff, device, c=0.000001, clip_value=150):
     """
     Loop over batches and train model
     return: batch-averaged loss over the entire training epoch 
@@ -130,13 +132,24 @@ def train_energy_forces(args, model, loader, optimizer, energy_coeff, device, c,
     total_ef_loss = []
     total_e_loss, total_f_loss = [], []
 
+
     for data in loader:
-        #data = data.to(device)
-        data.pos.requires_grad = True
+
         optimizer.zero_grad()
         e = model(data)
-        f = torch.autograd.grad(e, data.pos, grad_outputs=torch.ones_like(e), retain_graph=True)[0]
 
+        for i, d in enumerate(data):
+            d.to(e.device)
+            # add artificial single-batch attribute
+            d.batch = torch.zeros_like(d.z, dtype=torch.long)
+            e_tmp = model.module(d).view(-1)
+            f_tmp = torch.autograd.grad(e_tmp, d.pos, grad_outputs=torch.ones_like(e_tmp), create_graph=False)[0]
+            if i == 0:
+                f=f_tmp
+            else:
+                f = torch.cat([f, f_tmp], dim=0)
+            # remove batch attribute
+            d.__delattr__('batch')
         ef_loss, e_loss, f_loss = energy_forces_loss(args, data, e, f, energy_coeff, e.device)
 
         with torch.no_grad():
@@ -147,6 +160,43 @@ def train_energy_forces(args, model, loader, optimizer, energy_coeff, device, c,
         ef_loss.backward()
         optimizer.step()
         
+    ave_ef_loss = sum(total_ef_loss)/len(total_ef_loss)
+    ave_e_loss = sum(total_e_loss)/len(total_e_loss)
+    ave_f_loss = sum(total_f_loss)/len(total_f_loss)
+    return ave_ef_loss, ave_e_loss, ave_f_loss
+
+
+def train_energy_forces(args, model, loader, optimizer, energy_coeff, device, c=0.000001, clip_value=150):
+    """
+    Loop over batches and train model
+    return: batch-averaged loss over the entire training epoch
+    """
+    model.train()
+    total_ef_loss = []
+    total_e_loss, total_f_loss = [], []
+
+
+    for data in loader:
+
+        optimizer.zero_grad()
+        e = model(data)
+
+        concat_loader = DataLoader(data, batch_size=len(data), shuffle=False)
+        for d in concat_loader:
+            d.to(e.device)
+            e_tmp = model.module(d).view(-1)
+            f = torch.autograd.grad(e_tmp, d.pos, grad_outputs=torch.ones_like(e_tmp), create_graph=False)[0]
+
+        ef_loss, e_loss, f_loss = energy_forces_loss(args, data, e, f, energy_coeff, e.device)
+
+        with torch.no_grad():
+            total_ef_loss.append(ef_loss.item())
+            total_e_loss.append(e_loss.item())
+            total_f_loss.append(f_loss.item())
+
+        ef_loss.backward()
+        optimizer.step()
+
     ave_ef_loss = sum(total_ef_loss)/len(total_ef_loss)
     ave_e_loss = sum(total_e_loss)/len(total_e_loss)
     ave_f_loss = sum(total_f_loss)/len(total_f_loss)
@@ -209,7 +259,7 @@ def get_idx_to_add(net, examine_loader, optimizer,
     return idx_to_add
 
 
-def get_pred_loss(args, model, loader, optimizer, energy_coeff, device, c, val=False):
+def get_pred_loss(args, model, loader, optimizer, energy_coeff, device, c=0.00001, val=False):
     """
     Gets the total loss on the test/val datasets.
     If validation set, then return MAE and STD also
@@ -219,19 +269,24 @@ def get_pred_loss(args, model, loader, optimizer, energy_coeff, device, c, val=F
     all_errs = []
     
     for data in loader:
-        #data = data.to(device)
-        data.pos.requires_grad = True
         optimizer.zero_grad()
 
         e = model(data)
-        f = torch.autograd.grad(e, data.pos, grad_outputs=torch.ones_like(e), retain_graph=False)[0]
+        concat_loader = DataLoader(data, batch_size=len(data), shuffle=False)
+        for d in concat_loader:
+            d.to(e.device)
+            e_tmp = model.module(d).view(-1)
+            f = torch.autograd.grad(e_tmp, d.pos, grad_outputs=torch.ones_like(e_tmp), create_graph=False)[0]
 
         ef_loss, e_loss, f_loss = energy_forces_loss(args, data, e, f, energy_coeff, e.device)
+
         with torch.no_grad():
             total_ef_loss.append(ef_loss.item())
         if val == True:
-            energies_loss = torch.abs(data.y - e)
-            f_red = torch.mean(torch.abs(data.f - f), dim=1)
+            y = torch.cat([d.y for d in data]).to(device)
+            f_true = torch.cat([d.f for d in data]).to(device)
+            energies_loss = torch.abs(y - e)
+            f_red = torch.mean(torch.abs(f_true - f), dim=1)
 
             f_mean = torch.zeros_like(e)
             cluster_sizes = data['size'] #data.size
