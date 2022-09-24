@@ -11,16 +11,12 @@ import sys
 import logging
 import argparse
 
-def load_model(args, model_cat, mode='eval', device='cpu', frozen=False):
+def load_model(args, mode='eval', device='cpu', frozen=False):
     """
     Load trained model for eval
-    model_cat = ['ipu', 'finetune', 'multifi']
     """
     
-    if model_cat in ['ipu','finetune']:
-        net = load_pretrained_model(args, model_cat, device=device, frozen=frozen)
-    else:
-        net = MultiFiSchNet(args, device = device)
+    net = load_pretrained_model(args, device=device, frozen=frozen)
     
     if mode=='eval':
         # set to eval mode
@@ -29,7 +25,7 @@ def load_model(args, model_cat, mode='eval', device='cpu', frozen=False):
 
     return net
 
-def load_pretrained_model(args, model_cat='', device='cpu', frozen=False):
+def load_pretrained_model(args, device='cpu', frozen=False):
     """
     Load single SchNet model
     """
@@ -72,6 +68,7 @@ class SchNet(nn.Module):
                  num_interactions: int = 4,
                  num_gaussians: int = 25,
                  cutoff: float = 6.0,
+                 max_num_atoms: int = 28,
                  batch_size: Optional[int] = None):
         """
         :param num_features (int): The number of hidden features used by both
@@ -91,6 +88,7 @@ class SchNet(nn.Module):
         self.num_interactions = num_interactions
         self.num_gaussians = num_gaussians
         self.cutoff = cutoff
+        self.max_num_atoms = max_num_atoms
         self.batch_size = batch_size
 
         self.atom_embedding = nn.Embedding(100,
@@ -173,7 +171,7 @@ class SchNet(nn.Module):
         pos = data.pos
         edge_index = knn_graph(
             data.pos,
-            28,
+            self.max_num_atoms,
             data.batch,
             loop=False,
         )
@@ -217,64 +215,3 @@ class SchNet(nn.Module):
 
 
 
-class MultiFiSchNet(nn.Module):
-    def __init__(self,
-                 args,
-                 device = 'cpu'):
-        """
-        :param model_path (str): Path to trained model
-        :param device (str): Device to run model on ['cpu', 'cuda']
-        """
-        super().__init__()
-        
-        self.args = args
-        
-        # load pretrained model
-        self.lowfi_model = load_pretrained_model(args, model_cat='finetune', frozen=True, device=device)
-
-        # freeze lowfi model layers
-        for param in self.lowfi_model.parameters():
-            param.requires_grad = False
-            
-        # load empty model with smaller architecture
-        state=torch.load(args.start_model, map_location=torch.device(device))
-        num_gaussians = state['basis_expansion.offset'].shape[0]
-        num_filters = state['interactions.0.mlp.0.weight'].shape[0]
-        num_interactions = len([key for key in state.keys() if '.lin.bias' in key])
-        
-        self.dif_model = SchNet(num_features = int(num_filters/2),
-                     num_interactions = int((num_interactions+1)/2),
-                     num_gaussians = num_gaussians,
-                     cutoff = 6.0)
-        
-        self.dif_model.to(device)
-        
-        for p in self.dif_model.parameters():
-            p.register_hook(lambda grad: torch.clamp(grad, -args.clip_value, args.clip_value))
-
-        # correlation/sum layer 
-        self.correlation = nn.Linear(1, 1, bias=False, device=device)
-        
-        s = self.correlation.state_dict()
-        for k in s.keys():
-            s[k] = torch.ones_like(s[k])
-        self.correlation.load_state_dict(s)
-        
-        for p in self.correlation.parameters():
-            p.register_hook(lambda grad: torch.clamp(grad, -args.clip_value, args.clip_value))
-
-
-    def forward(self, data):
-        """
-        Forward pass of the SchNet model
-        :param data: data from data loader
-        """     
-        
-        y_low = self.correlation(self.lowfi_model(data).view(-1,1)).T[0]
-        y_dif = self.dif_model(data)
-        
-        # interleave y_low and y_dif
-        y = torch.stack((y_low,y_dif), dim=1).view(-1,2)
-        y = torch.sum(y, dim=1)
-        
-        return y

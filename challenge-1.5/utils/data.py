@@ -112,12 +112,3 @@ def test_dataloader(model_cat,
     return loader
 
 
-def get_max_forces(data, forces):
-    # data: data from DataLoader
-    # forces: data.f for actual, f for pred
-    start = 0
-    f_actual=[]
-    for size in data.size.numpy()*3:
-        f_actual.append(np.abs(data.f[start:start+size].numpy()).max())   
-        start += size
-    return f_actual

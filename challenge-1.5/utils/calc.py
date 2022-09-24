@@ -7,8 +7,7 @@ from ase.calculators.calculator import Calculator, all_changes
 from torch.nn import functional as F
 from torch_geometric.data import Data
 
-sys.path.insert(0, '/people/herm379/exalearn/IPU_trained_models/pnnl_sandbox/schnet')
-from model import SchNet
+from .model import SchNet
 
 from ase.calculators.calculator import Calculator, all_changes
 from ase.optimize.optimize import Optimizer

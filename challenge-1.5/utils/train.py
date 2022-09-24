@@ -9,64 +9,6 @@ from torch.utils.data import ConcatDataset
 from torch_geometric.data import DataListLoader, DataLoader
 from scipy.special import erfinv
 
-def percent_error(actual, pred, c=1e-6):
-    return torch.mean(torch.abs((actual-pred)/(actual+c)))
-
-
-def percent_error_squared(actual, pred, c=1e-6):
-    return torch.mean(torch.square((actual-pred)/(actual+c)))
-
-
-def mean_squared_error(actual, pred):
-    return torch.mean(torch.square(actual-pred))
-
-
-def mean_absoulute_error(actual, pred):
-    return torch.mean(torch.abs(actual-pred))
-
-
-# don't need to normalize by size because schnet is size extensive
-# reference energies not needed because all clusters have O:H in same proportion
-def e_loss(actual, pred, c): 
-    return percent_error_squared(actual, pred)
-
-    
-def f_loss(actual, pred, c):
-    return percent_error_squared(actual, pred)
-
-
-def relative(data, p_energies, p_forces, energy_coeff, c):
-    """
-    Compute the weighted relative loss for the energies and forces of each batch.
-    """
-    energies_loss = e_loss(data.y, p_energies, c)
-    forces_loss = f_loss(data.f, p_forces, c)
-    total_loss = (energy_coeff)*(energies_loss) + (1-energy_coeff)*(forces_loss)
-  
-    return total_loss, energies_loss, forces_loss
-
-
-def relative_energy(data, p_energies, p_forces, energy_coeff, c):
-    """
-    Compute the weighted relative loss for the energies and forces of each batch.
-    """
-    energies_loss = e_loss(data.y, p_energies, c)
-    forces_loss = torch.mean(torch.square(data.f - p_forces))
-    total_loss = (energy_coeff)*(energies_loss) + (1-energy_coeff)*(forces_loss)
-  
-    return total_loss, energies_loss, forces_loss
-
-
-def relative_gradient(data, p_energies, p_forces, energy_coeff, c):
-    """
-    Compute the weighted relative loss for the energies and forces of each batch.
-    """
-    energies_loss = torch.mean(torch.square(data.y - p_energies))
-    forces_loss = f_loss(data.f, p_forces, c)
-    total_loss = (energy_coeff)*(energies_loss) + (1-energy_coeff)*(forces_loss)
-  
-    return total_loss, energies_loss, forces_loss
-
 
 def mse(data, p_energies, p_forces, energy_coeff, device):
     """
@@ -80,27 +22,18 @@ def mse(data, p_energies, p_forces, energy_coeff, device):
     return total_loss, energies_loss, forces_loss
 
 
-def energy_forces_loss(args, data, p_energies, p_forces, energy_coeff, device):
+def energy_forces_loss(args, data, p_energies, p_forces, device):
     """
     Compute the weighted MSE loss for the energies and forces of each batch.
     """
     if args.loss_fn == "mse":
-        return mse(data, p_energies, p_forces, energy_coeff, device)
+        return mse(data, p_energies, p_forces, args.energy_coeff, device)
 
-    elif args.loss_fn == "relative":
-        return relative(data, p_energies, p_forces, energy_coeff, c)
-
-    elif args.loss_fn == "relative_energy":
-        return relative_energy(data, p_energies, p_forces, energy_coeff, c)
-
-    elif args.loss_fn == "relative_grad":
-        return relative_gradient(data, p_energies, p_forces, energy_coeff, c)
     else:
-        loss_fn = args.loss_fn
-        raise(NotImplementedError(f'Loss funciton tag "{loss_fn}" not implemented'))
+        raise(NotImplementedError(f'Loss funciton tag "{args.loss_fn}" not implemented'))
         
 
-def train_energy_only(args, model, loader, optimizer, energy_coeff, device, clip_value=150):
+def train_energy_only(args, model, loader, optimizer, device, clip_value=150):
     """
     Loop over batches and train model
     return: batch-averaged loss over the entire training epoch
@@ -123,50 +56,7 @@ def train_energy_only(args, model, loader, optimizer, energy_coeff, device, clip
     return ave_e_loss
 
 
-def train_energy_forces_slow(args, model, loader, optimizer, energy_coeff, device, c=0.000001, clip_value=150):
-    """
-    Loop over batches and train model
-    return: batch-averaged loss over the entire training epoch 
-    """
-    model.train()
-    total_ef_loss = []
-    total_e_loss, total_f_loss = [], []
-
-
-    for data in loader:
-
-        optimizer.zero_grad()
-        e = model(data)
-
-        for i, d in enumerate(data):
-            d.to(e.device)
-            # add artificial single-batch attribute
-            d.batch = torch.zeros_like(d.z, dtype=torch.long)
-            e_tmp = model.module(d).view(-1)
-            f_tmp = torch.autograd.grad(e_tmp, d.pos, grad_outputs=torch.ones_like(e_tmp), create_graph=False)[0]
-            if i == 0:
-                f=f_tmp
-            else:
-                f = torch.cat([f, f_tmp], dim=0)
-            # remove batch attribute
-            d.__delattr__('batch')
-        ef_loss, e_loss, f_loss = energy_forces_loss(args, data, e, f, energy_coeff, e.device)
-
-        with torch.no_grad():
-            total_ef_loss.append(ef_loss.item())
-            total_e_loss.append(e_loss.item())
-            total_f_loss.append(f_loss.item())
-
-        ef_loss.backward()
-        optimizer.step()
-        
-    ave_ef_loss = sum(total_ef_loss)/len(total_ef_loss)
-    ave_e_loss = sum(total_e_loss)/len(total_e_loss)
-    ave_f_loss = sum(total_f_loss)/len(total_f_loss)
-    return ave_ef_loss, ave_e_loss, ave_f_loss
-
-
-def train_energy_forces(args, model, loader, optimizer, energy_coeff, device, c=0.000001, clip_value=150):
+def train_energy_forces(args, model, loader, optimizer, device, clip_value=150):
     """
     Loop over batches and train model
     return: batch-averaged loss over the entire training epoch
@@ -187,7 +77,7 @@ def train_energy_forces(args, model, loader, optimizer, energy_coeff, device, c=
             e_tmp = model.module(d).view(-1)
             f = torch.autograd.grad(e_tmp, d.pos, grad_outputs=torch.ones_like(e_tmp), create_graph=False)[0]
 
-        ef_loss, e_loss, f_loss = energy_forces_loss(args, data, e, f, energy_coeff, e.device)
+        ef_loss, e_loss, f_loss = energy_forces_loss(args, data, e, f, e.device)
 
         with torch.no_grad():
             total_ef_loss.append(ef_loss.item())
@@ -214,52 +104,7 @@ def get_error_distribution(err_list):
     return mae, np.sqrt(var)
 
 
-def get_idx_to_add(net, examine_loader, optimizer,
-                   mae, std, energy_coeff, 
-                   split_file, al_step, device, min_nonmin,
-                   max_to_add=0.15, error_tolerance=0.15,
-                   savedir = './'):
-    """
-    Computes the normalized (by cluster size) errors for all entries in the examine set. It will add a max of
-    max_to_add samples that are p < 0.15.
-    """
-    net.eval()
-    all_errs = []
-    for data in examine_loader:
-        #data = data.to(device)
-        data.pos.requires_grad = True
-        optimizer.zero_grad()
-
-        e = net(data)
-        f = torch.autograd.grad(e, data.pos, grad_outputs=torch.ones_like(e), retain_graph=False)[0]
-        energies_loss = torch.abs(data.y - e)
-        f_red = torch.mean(torch.abs(data.f - f), dim=1)
-        
-        f_mean = torch.zeros_like(e)
-        cluster_sizes = data['size'] #data.size
-        for i in range(len(e)):            #loop over all clusters in batch
-            energies_loss[i] /= cluster_sizes[i]
-            f_mean[i] = torch.mean(torch.abs(torch.tensor(f_red[torch.sum(cluster_sizes[0:i]):torch.sum(cluster_sizes[0:i+1])]))).clone().detach()
-        
-        total_err = (energy_coeff)*energies_loss + (1-energy_coeff)*f_mean
-        total_err = total_err.tolist()
-        all_errs += total_err
-    
-    with open(os.path.join(savedir, f'error_distribution_alstep{al_step}_{min_nonmin}.pkl'), 'wb') as f:
-        pickle.dump(all_errs, f)    
-
-    S = np.load(os.path.join(savedir, split_file))
-    examine_idx = S["examine_idx"].tolist()
-    
-    cutoff = erfinv(1-error_tolerance) * std + mae
-    n_samples_to_add = int(len(all_errs)*max_to_add)
-    idx_highest_errors = np.argsort(np.array(all_errs))[-n_samples_to_add:]
-    idx_to_add = [examine_idx[idx] for idx in idx_highest_errors if all_errs[idx]>=cutoff]
-    
-    return idx_to_add
-
-
-def get_pred_loss(args, model, loader, optimizer, energy_coeff, device, c=0.00001, val=False):
+def get_pred_loss(args, model, loader, optimizer, device, val=False):
     """
     Gets the total loss on the test/val datasets.
     If validation set, then return MAE and STD also
@@ -277,8 +122,9 @@ def get_pred_loss(args, model, loader, optimizer, energy_coeff, device, c=0.0000
             d.to(e.device)
             e_tmp = model.module(d).view(-1)
             f = torch.autograd.grad(e_tmp, d.pos, grad_outputs=torch.ones_like(e_tmp), create_graph=False)[0]
+            cluster_size = d['size']
 
-        ef_loss, e_loss, f_loss = energy_forces_loss(args, data, e, f, energy_coeff, e.device)
+        ef_loss, e_loss, f_loss = energy_forces_loss(args, data, e, f, e.device)
 
         with torch.no_grad():
             total_ef_loss.append(ef_loss.item())
@@ -289,12 +135,11 @@ def get_pred_loss(args, model, loader, optimizer, energy_coeff, device, c=0.0000
             f_red = torch.mean(torch.abs(f_true - f), dim=1)
 
             f_mean = torch.zeros_like(e)
-            cluster_sizes = data['size'] #data.size
-            for i in range(len(e)):            #loop over all clusters in batch
+            for i in range(len(e)):
                 energies_loss[i] /= cluster_sizes[i]
                 f_mean[i] = torch.mean(torch.abs(torch.tensor(f_red[torch.sum(cluster_sizes[0:i]):torch.sum(cluster_sizes[0:i+1])])))
 
-            total_err = (energy_coeff)*energies_loss + (1-energy_coeff)*f_mean
+            total_err = (args.energy_coeff)*energies_loss + (1-args.energy_coeff)*f_mean
             total_err = total_err.tolist()
             all_errs += total_err
     
@@ -304,10 +149,10 @@ def get_pred_loss(args, model, loader, optimizer, energy_coeff, device, c=0.0000
         return ave_ef_loss
     
     else:
-        mae, stdvae = get_error_distribution(all_errs) #MAE and STD from EXAMINE SET
+        mae, stdvae = get_error_distribution(all_errs) 
         return ave_ef_loss, mae, stdvae
 
-def get_pred_eloss(args, model, loader, optimizer, energy_coeff, device):
+def get_pred_eloss(args, model, loader, optimizer, device):
     model.eval()
     total_e_loss = []
 

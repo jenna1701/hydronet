@@ -74,27 +74,27 @@ train_loader, val_loader, _ = data.init_dataloader(args)
 ######## LOAD MODEL ########
 
 # load model
-net = models.load_model(args, args.model_cat, device=device)
+net = models.load_model(args, device=device)
 net = DataParallel(net)
 logging.info(f'model loaded from {args.start_model}')
 
 #initialize optimizer and LR scheduler
 optimizer = torch.optim.Adam(net.parameters(), lr=args.start_lr)
-scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=5, factor=0.8, min_lr=0.000001)
+scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=10, factor=0.8, min_lr=0.000001)
 
 # implement early stopping
-early_stopping = hooks.EarlyStopping(patience=10, verbose=True, 
+early_stopping = hooks.EarlyStopping(patience=50, verbose=True, 
                                      path = os.path.join(args.savedir, 'best_model.pt'),
                                      trace_func=logging.info)
 
 for total_epochs in tqdm(range(args.n_epochs)):
 
     if args.train_forces:
-        train_loss, e_loss, f_loss = train.train_energy_forces(args, net, train_loader, optimizer, args.energy_coeff, device)
-        val_loss = train.get_pred_loss(args, net, val_loader, optimizer, args.energy_coeff, device)
+        train_loss, e_loss, f_loss = train.train_energy_forces(args, net, train_loader, optimizer, device)
+        val_loss = train.get_pred_loss(args, net, val_loader, optimizer, device)
     else:
-        train_loss = train.train_energy_only(args, net, train_loader, optimizer, args.energy_coeff, device)
-        val_loss = train.get_pred_eloss(args, net, val_loader, optimizer, args.energy_coeff, device)
+        train_loss = train.train_energy_only(args, net, train_loader, optimizer, device)
+        val_loss = train.get_pred_eloss(args, net, val_loader, optimizer, device)
 
     scheduler.step(val_loss)
     
