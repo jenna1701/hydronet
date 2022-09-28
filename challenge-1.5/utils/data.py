@@ -3,47 +3,7 @@ import os.path as op
 from torch_geometric.data import DataListLoader, DataLoader
 from torch.utils.data import ConcatDataset
 from utils.water_dataset import PrepackedDataset, gc_WaterDataSet
-
 import sys
-
-def dataloader(datasets,
-               mode,
-               split = '00', 
-               batch = 128,
-               shuffle=True,
-               splitdir = './data/splits/',
-               datadir = './data/cached_dataset/'
-               ):
-    """
-    dataset = str or list of str for each dataset label ['min', 'nonmin']
-    mode = ['train','val','examine','test']
-    """
-
-    if isinstance(datasets, list):
-        data = []
-        for ds in datasets:
-            dataset = PrepackedDataset(None, 
-                                       op.join(splitdir,f'split_{split}_{ds}.npz'), 
-                                       ds, 
-                                       directory=datadir)
-            data.append(dataset.load_data(mode))
-        
-        batch_size = batch if len(data) > batch else len(data)
-        loader = DataListLoader(ConcatDataset(data), batch_size=batch_size, shuffle=shuffle)
-        
-    else:
-        dataset = PrepackedDataset(None, 
-                                   op.join(splitdir,f'split_{split}_{datasets}.npz'), 
-                                   datasets, 
-                                   directory=datadir)
-        data = dataset.load_data(mode)
-
-        print(f'{datasets} data loaded from {datadir}')
-
-        batch_size = batch if len(data) > batch else len(data)
-        loader = DataListLoader(data, batch_size=batch_size, shuffle=shuffle)
-
-    return loader
 
 
 def init_dataloader(args, 
@@ -68,13 +28,15 @@ def init_dataloader(args,
         
         train_data.append(dataset.load_data('train'))
         val_data.append(dataset.load_data('val'))
-        examine_data.append(dataset.load_data('examine'))
-        
-    train_loader = DataListLoader(ConcatDataset(train_data), batch_size=args.batch_size, shuffle=shuffle, pin_memory=pin_memory)
-    val_loader = DataListLoader(ConcatDataset(val_data), batch_size=args.batch_size, shuffle=shuffle, pin_memory=pin_memory)
-    examine_loaders = [DataListLoader(ed, batch_size=args.batch_size, shuffle=shuffle, pin_memory=pin_memory) for ed in examine_data]
+
+    if args.parallel:    
+        train_loader = DataListLoader(ConcatDataset(train_data), batch_size=args.batch_size, shuffle=shuffle, pin_memory=pin_memory)
+        val_loader = DataListLoader(ConcatDataset(val_data), batch_size=args.batch_size, shuffle=shuffle, pin_memory=pin_memory)
+    else:
+        train_loader = DataLoader(ConcatDataset(train_data), batch_size=args.batch_size, shuffle=shuffle, pin_memory=pin_memory)
+        val_loader = DataLoader(ConcatDataset(val_data), batch_size=args.batch_size, shuffle=shuffle, pin_memory=pin_memory)
     
-    return train_loader, val_loader, examine_loaders
+    return train_loader, val_loader
 
 
 def test_dataloader(model_cat, 

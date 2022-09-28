@@ -11,7 +11,7 @@ import sys
 import logging
 import argparse
 
-def load_model(args, mode='eval', device='cpu', frozen=False):
+def load_model(args, mode='train', device='cpu', frozen=False):
     """
     Load trained model for eval
     """
@@ -51,6 +51,8 @@ def load_pretrained_model(args, device='cpu', frozen=False):
         # load trained weights into model
         net.load_state_dict(state)
         logging.info('model weights loaded')
+    else:
+        net.reset_parameters()
     
     net.to(device)
     
@@ -107,8 +109,6 @@ class SchNet(nn.Module):
         self.lin1 = nn.Linear(self.num_features, self.num_features // 2)
         self.act = ShiftedSoftplus()
         self.lin2 = nn.Linear(self.num_features // 2, 1)
-
-        self.reset_parameters()
 
     def hyperparameters(self):
         """

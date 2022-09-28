@@ -45,6 +45,11 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 print('torch available',torch.cuda.is_available())
 logging.info(f'model will be trained on {device}')
 
+# increase batch size based on the number of GPUs
+if device == 'cuda' and args.parallel:
+    n_gpus = torch.cuda.device_count()
+    args.batch_size = int(n_gpus * args.batch_size)
+    logging.info(f'... {n_gpus} found, multipying batch size accordingly (batch size now {args.batch_size})')
 
 ######## LOAD DATA ########
 # get initial train, val, examine splits for dataset(s)
@@ -55,6 +60,7 @@ if args.create_splits:
         args.datasets = [args.datasets]
     for dataset in args.datasets:
         #TODO only uses min cluster_path at the moment
+        # change to read len of db 
         split.create_init_split(args, dataset) 
 else:
     # copy initial split(s) to savedir
@@ -68,14 +74,15 @@ else:
                     os.path.join(args.savedir, f'split_00_{args.datasets}.npz'))
 
 # load datasets/dataloaders
-train_loader, val_loader, _ = data.init_dataloader(args)
+train_loader, val_loader = data.init_dataloader(args)
 
     
 ######## LOAD MODEL ########
 
 # load model
 net = models.load_model(args, device=device)
-net = DataParallel(net)
+if device == 'cuda' and args.parallel:
+    net = DataParallel(net)
 logging.info(f'model loaded from {args.start_model}')
 
 #initialize optimizer and LR scheduler
@@ -87,7 +94,8 @@ early_stopping = hooks.EarlyStopping(patience=50, verbose=True,
                                      path = os.path.join(args.savedir, 'best_model.pt'),
                                      trace_func=logging.info)
 
-for total_epochs in tqdm(range(args.n_epochs)):
+total_epochs = 0
+for _ in tqdm(range(args.n_epochs)):
 
     if args.train_forces:
         train_loss, e_loss, f_loss = train.train_energy_forces(args, net, train_loader, optimizer, device)
@@ -108,6 +116,8 @@ for total_epochs in tqdm(range(args.n_epochs)):
     early_stopping(val_loss, net)
     if early_stopping.early_stop:
         break
+
+    total_epochs+=1
 
 # close tensorboard logger
 writer.close()

@@ -3,11 +3,11 @@
 ## Example usage
 Set training arguments in `train_args.json`:
 ```
+    "parallel" (bool): flag for training over multiple GPUs
     "create_splits" (bool): flag to create new split file
     "cluster_path" (str): path to npy file with indices of all structures in database
     "n_train" (int): number of samples in training set
     "n_val" (int): number of samples in validaiton set 
-    "n_examine" (int): number of samples in test set
     "splitdir" (str): path to directory with split files (used when "create_splits": false)
     "datadir" (str): path to directory with databases
     "train_forces" (bool): flag to include force predictions in the loss function
