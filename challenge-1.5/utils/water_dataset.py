@@ -10,10 +10,10 @@ import tempfile
 import os
 from copy import deepcopy as copy
 from pathlib import Path
-from tqdm import tqdm
 from torch_geometric.data import DataListLoader, DataLoader, InMemoryDataset, Data, extract_zip, download_url
 import h5py
 import logging
+import warnings
 
 class PrepackedDataset(torch.utils.data.Dataset):
     def __init__(self, loader_list, split_file, dataset_type, shuffle=True, mode="train", directory="./data/cached_dataset/"):
@@ -27,17 +27,13 @@ class PrepackedDataset(torch.utils.data.Dataset):
         if not os.path.exists(directory):
             os.makedirs(directory)
 
-        if loader_list is None:
-            #self.dataset_type = 'nonmin'
-            #data = self.load_data()
-            pass
-        else:
-            for i in range(len(loader_list)): #loop over min and nonmin loaders
+        # Create new hdf5
+        if loader_list is not None:
+            for i in range(len(loader_list)): 
                 loader = loader_list[i]
                 self.create_container(loader)
                 logging.info("Finishing processing data...")
-                bar = tqdm(enumerate(loader), total=len(loader))
-                for index, data in bar:
+                for index, data in enumerate(loader):
                     self.x[index][:data.size*3, :] = copy(data.x).to(torch.uint8)
                     self.z[index][:data.size*3] = copy(data.z).to(torch.uint8)
                     self.pos[index][:data.size*3] = copy(data.pos).to(torch.float32)
@@ -82,12 +78,8 @@ class PrepackedDataset(torch.utils.data.Dataset):
         logging.info("Loading cached data from disk...")
         dataset = h5py.File(os.path.join(self.directory, f"{self.dataset_type}_data.hdf5"), "r")
 
-        if False: #popdist.isPopdistEnvSet():
-            self.dataset_size = len(dataset["z"]) // int(popdist.getNumTotalReplicas())
-            self.read_offset = popdist.getInstanceIndex() * self.dataset_size
-        else:
-            S = np.load(self.split_file)
-            self.mode_idx = S[f'{idx_type}_idx']
+        S = np.load(self.split_file)
+        self.mode_idx = S[f'{idx_type}_idx']
 
         data_list = []
         for i in range(len(self.mode_idx)):
@@ -99,7 +91,11 @@ class PrepackedDataset(torch.utils.data.Dataset):
             pos = torch.from_numpy(dataset["pos"][index][:cluster_size*3])
             pos.requires_grad = True
             y = torch.from_numpy(dataset["y"][index])
-            f = torch.from_numpy(dataset["f"][index][:cluster_size*3])
+            try:
+                f = torch.from_numpy(dataset["f"][index][:cluster_size*3])
+            except:
+                f = torch.zeros_like(pos, dtype=torch.int8)
+                warnings.warn('Dataset does not contain forces information.')
             size = torch.from_numpy(dataset["size"][index])
             data = Data(x=x, z=z, pos=pos, y=y, f=f, size=size)
             data_list.append(data)
@@ -237,146 +233,3 @@ class WaterDataSet(InMemoryDataset):
         return self.collate(data_list)
 
     
-class gc_WaterDataSet(InMemoryDataset):
-    #raw_url = "https://drive.google.com/uc?id=1ZQNOhJnz0k_UWxc-CIIkYwE2d5o230Ad&export=download"
-
-    def __init__(self,
-                 sample,
-                 root: Optional[str] = None,
-                 transform: Optional[Callable] = None,
-                 pre_transform: Optional[Callable] = None,
-                 pre_filter: Optional[Callable] = None,
-                 split_file: Optional[str] = None,
-                 h5py_file: Optional[str] = None,
-                 idx_type: Optional[str] = 'test'
-                 ):
-        """
-        Args:
-            root: Directory where processed output will be saved
-            transform: Transform to apply to data
-            pre_transform: Pre-transform to apply to data
-            pre_filter: Pre-filter to apply to data
-        """
-        self.atom_types = [1, 8]
-        self.sample = sample
-        self.root = root
-        self.transform = transform
-        self.pre_transform = pre_transform
-        self.pre_filter = pre_filter
-        self.split_file = split_file
-        self.h5py_file = h5py_file
-        self.idx_type = idx_type
-        super().__init__(root, transform, pre_transform, pre_filter)
-        self.data, self.slices = torch.load(self.processed_paths[0])
-
-    @property
-    def raw_file_names(self):
-        # NB: database file
-        return f'{self.sample}.db'
-
-    @property
-    def processed_file_names(self):
-        return f'{self.sample}.pt'
-
-    def download(self):
-        """
-        The base class will automatically look for a file that matches the raw_file_names property in a directory named 'raw'. If it doesn't find it, it will download the data using this method
-        :return:
-        
-        raw_file_path = osp.join(self.raw_dir, self.raw_file_names)
-        if osp.exists(raw_file_path):
-            print(f'Using existing file {self.raw_file_names}',
-                  file=sys.stderr)
-            return
-        else:
-            with tempfile.TemporaryFile() as fp:
-                extract_zip(gdown.download(self.raw_url, fp), self.raw_dir)
-            self.clean_up()
-        """
-        print('no download')
-        
-    def clean_up(self):
-        """
-        Remove the dataset that isn't used
-        The datasets come bundled in a zip file. By default, both are downloaded and extracted. They can be fairly large, so this removes the dataset which isn't used.
-        """
-        db_to_remove = osp.join(self.raw_dir, 'even_split_subset_500k_test.db')
-        if osp.exists(db_to_remove):
-            os.remove(db_to_remove)
-
-    def process(self):
-        """
-        Processes the raw data and saves it as a Torch Geometric data set
-        The steps does all pre-processing required to put the data extracted from the database into graph 'format'. Several transforms are done on the data in order to generate the graph structures used by training.
-        The processed dataset is automatically placed in a directory named processed, with the name of the processed file name property. If the processed file already exists in the correct directory, the processing step will be skipped.
-        :return: Torch Geometric Dataset
-        """
-        
-        if self.h5py_file == None:
-            # NB: coding for atom types
-            types = {'H': 0, 'O': 1}
-
-            data_list = []
-            dbfile = osp.join(self.root, "raw", self.raw_file_names)
-            assert osp.isfile(dbfile), f"Database file not found: {dbfile}"
-
-            with connect(dbfile) as conn:
-                center = True # hardcoding this for now to emulate SchnetPack
-                for i, row in enumerate(conn.select()):
-                    if i % 50000 == 0:
-                        logging.info(f'atoms processed {i}')
-                    name = "energy"
-                    mol = row.toatoms()
-                    # get target (energy)
-                    #  The training target is the potential energy, which is stored in y
-                    y = torch.tensor(row.data[name], dtype=torch.float)
-                    if center:
-                        pos = mol.get_positions() - mol.get_center_of_mass()
-                    else:
-                        pos = mol.get_positions()
-                    pos = torch.tensor(pos, dtype=torch.float)
-                    type_idx = [types.get(i) for i in mol.get_chemical_symbols()]
-                    atomic_number = mol.get_atomic_numbers()
-                    z = torch.tensor(atomic_number, dtype=torch.long)
-                    x = F.one_hot(torch.tensor(type_idx, dtype=torch.long),
-                                  num_classes=len(self.atom_types))
-
-                    data = Data(x=x, z=z, pos=pos, y=y, name=name, idx=i)
-
-                    if self.pre_filter is not None and not self.pre_filter(data):
-                        continue
-                    # The graph edge_attr and edge_indices are created when the transforms are applied
-                    if self.pre_transform is not None:
-                        data = self.pre_transform(data)
-
-                    data_list.append(data)
-
-            torch.save(self.collate(data_list), self.processed_paths[0])
-        else:
-            self.convert_h5_to_torch()
-
-    def convert_h5_to_torch(self):
-        dataset = h5py.File(self.h5py_file, "r")
-
-        S = np.load(self.split_file)
-        data_idx = S[f'{self.idx_type}_idx']
-
-        data_list = []
-        for i in range(len(data_idx)):
-            index = data_idx[i]
-            name='energy'
-            cluster_size = dataset["size"][index][0]
-            z = torch.from_numpy(dataset["z"][index][:cluster_size*3])
-            x = torch.from_numpy(dataset["x"][index][:cluster_size*3])
-            pos = torch.from_numpy(dataset["pos"][index][:cluster_size*3])
-            y = torch.from_numpy(dataset["y"][index])
-            f = torch.from_numpy(dataset["f"][index][:cluster_size*3])
-
-            data = Data(x=x, z=z, pos=pos, y=y, name=name, idx=i, size=cluster_size, f=f)
-
-            # run data transform
-            data = self.pre_transform(data)
-
-            data_list.append(data)
-
-        torch.save(self.collate(data_list), self.processed_paths[0])

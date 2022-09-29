@@ -1,8 +1,12 @@
 import os
 import numpy as np
+import h5py
 
 def create_init_split(args, suffix):
-    cluster_list = np.load(args.cluster_path)
+    dataset = h5py.File(os.path.join(args.datadir, f"{suffix}_data.hdf5"), "r")
+    keys = list(dataset.keys())
+    cluster_list = np.arange(0,dataset[keys[0]].shape[0], step=1, dtype=np.int64)
+    #cluster_list = np.load(args.cluster_path)
     np.random.shuffle(cluster_list)
     train_idx = cluster_list[0:args.n_train]
     val_idx = cluster_list[args.n_train:(args.n_train+args.n_val)]

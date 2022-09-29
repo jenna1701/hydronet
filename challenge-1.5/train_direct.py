@@ -90,7 +90,7 @@ optimizer = torch.optim.Adam(net.parameters(), lr=args.start_lr)
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=10, factor=0.8, min_lr=0.000001)
 
 # implement early stopping
-early_stopping = hooks.EarlyStopping(patience=50, verbose=True, 
+early_stopping = hooks.EarlyStopping(patience=500, verbose=True, 
                                      path = os.path.join(args.savedir, 'best_model.pt'),
                                      trace_func=logging.info)
 
@@ -113,9 +113,9 @@ for _ in tqdm(range(args.n_epochs)):
     writer.add_scalar(f'learning_rate', optimizer.param_groups[0]["lr"], total_epochs)
     
     # check for stopping point
-    early_stopping(val_loss, net)
-    if early_stopping.early_stop:
-        break
+    #early_stopping(val_loss, net)
+    #if early_stopping.early_stop:
+    #    break
 
     total_epochs+=1
 
