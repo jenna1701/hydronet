@@ -5,7 +5,6 @@ Set training arguments in `train_args.json`:
 ```
     "parallel" (bool): flag for training over multiple GPUs
     "create_splits" (bool): flag to create new split file
-    "cluster_path" (str): path to npy file with indices of all structures in database
     "n_train" (int): number of samples in training set
     "n_val" (int): number of samples in validaiton set 
     "splitdir" (str): path to directory with split files (used when "create_splits": false)
