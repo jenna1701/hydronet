@@ -1,4 +1,5 @@
 import os 
+import sys
 import logging
 import torch
 import numpy as np
@@ -8,7 +9,6 @@ from torch_geometric.nn import DataParallel
 from torch.utils.data import ConcatDataset
 from torch_geometric.data import DataListLoader, DataLoader
 from scipy.special import erfinv
-
 
 
 def energy_forces_loss(args, data, p_energies, p_forces, device):
@@ -45,6 +45,7 @@ def train_energy_only(args, model, loader, optimizer, device, clip_value=150):
 
         optimizer.zero_grad()
         e = model(data)
+
         if args.parallel:
             y = torch.cat([d.y for d in data]).to(e.device)
         else:
@@ -58,6 +59,7 @@ def train_energy_only(args, model, loader, optimizer, device, clip_value=150):
         optimizer.step()
 
     ave_e_loss = sum(total_e_loss)/len(total_e_loss)
+
     return ave_e_loss
 
 

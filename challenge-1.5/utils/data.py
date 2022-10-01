@@ -2,7 +2,7 @@ import os
 import os.path as op
 from torch_geometric.data import DataListLoader, DataLoader
 from torch.utils.data import ConcatDataset
-from utils.water_dataset import PrepackedDataset
+from utils.datasets import PrepackedDataset
 import sys
 
 
