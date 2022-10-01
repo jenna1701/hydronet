@@ -1,6 +1,18 @@
 # Pytorch Geometric Implementation of SchNet
 
-## Example usage
+## Conda Environment
+```
+conda install pytorch==1.9.0 cudatoolkit=11.1 -c pytorch -c conda-forge
+conda install pyg -c pyg
+conda install -c conda-forge tensorboard ase fair-research-login h5py tqdm
+```
+
+## Data Preprocessing
+The HydroNet water cluster minima (`$ID='min'`)and QM9 (`$ID='qm9'`) datasets can be downloaded and preprocessed with the following call:
+
+`python preprocess.py --sample $ID`
+
+## Training 
 Set training arguments in `train_args.json`:
 ```
     "parallel" (bool): flag for training over multiple GPUs
@@ -24,4 +36,4 @@ Set training arguments in `train_args.json`:
 
 Training is run with the following call:
 
-`python train_direct.py --savedir './test_train' --args 'train_args.json'
+`python train_direct.py --savedir './test_train' --args 'train_args.json'`
