@@ -190,7 +190,7 @@ class WaterMinimaDataSet(InMemoryDataset):
             zip_ref.extractall('./')
             
         os.remove(zip_file_name)
-        shutil.move(osp.join('./water_db','ALL_geoms_all_sorted.db'), osp.join(self.root, 'hydronet_minima.db'))
+        shutil.move(osp.join('./water_db','ALL_geoms_all_sorted.db'), osp.join(self.root, f'{self.sample}.db'))
         shutil.rmtree('./water_db')
 
         logging.info("Done downloading data.")
