@@ -59,8 +59,6 @@ if args.create_splits:
     if not isinstance(args.datasets, list):
         args.datasets = [args.datasets]
     for dataset in args.datasets:
-        #TODO only uses min cluster_path at the moment
-        # change to read len of db 
         split.create_init_split(args, dataset) 
 else:
     # copy initial split(s) to savedir
@@ -113,9 +111,9 @@ for _ in tqdm(range(args.n_epochs)):
     writer.add_scalar(f'learning_rate', optimizer.param_groups[0]["lr"], total_epochs)
     
     # check for stopping point
-    #early_stopping(val_loss, net)
-    #if early_stopping.early_stop:
-    #    break
+    early_stopping(val_loss, net)
+    if early_stopping.early_stop:
+        break
 
     total_epochs+=1
 
