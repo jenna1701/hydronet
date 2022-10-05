@@ -50,7 +50,9 @@ def train_energy_only(args, model, loader, optimizer, device, clip_value=150):
             y = torch.cat([d.y for d in data]).to(e.device)
         else:
             y = data.y.to(e.device)
-        e_loss = F.mse_loss(e.view(-1), y.view(-1), reduction="mean")
+
+        e_loss = torch.mean(torch.square(y.view(-1) - e.view(-1)))
+        #e_loss = F.mse_loss(e.view(-1), y.view(-1), reduction="mean")
 
         with torch.no_grad():
             total_e_loss.append(e_loss.item())
