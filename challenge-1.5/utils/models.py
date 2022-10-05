@@ -13,10 +13,21 @@ import argparse
 
 def load_model(args, mode='train', device='cpu', frozen=False):
     """
-    Load trained model for eval
+    Load model 
     """
-    
-    net = load_pretrained_model(args, device=device, frozen=frozen)
+    if args.load_model: 
+        net = load_pretrained_model(args, device=device, frozen=frozen)
+    else:
+        net = SchNet(num_features = args.num_features,
+             num_interactions = args.num_interactions,
+             num_gaussians = args.num_gaussians,
+             cutoff = args.cutoff)
+        net.reset_parameters()
+        net.to(device)
+        #register backward hook --> gradient clipping
+        if not frozen:
+            for p in net.parameters():
+                p.register_hook(lambda grad: torch.clamp(grad, -args.clip_value, args.clip_value))
     
     if mode=='eval':
         # set to eval mode
@@ -44,8 +55,8 @@ def load_pretrained_model(args, device='cpu', frozen=False):
                  num_interactions = num_interactions,
                  num_gaussians = num_gaussians,
                  cutoff = 6.0)
-    
-    logging.info(f'model loaded from {args.start_model}')
+
+    logging.info(f'model architecture loaded from {args.start_model}')
     
     if args.load_state:
         # load trained weights into model
@@ -200,18 +211,6 @@ class SchNet(nn.Module):
 
         return out
 
-    @staticmethod
-    def loss(input, target):
-        """
-        Calculates the mean squared error
-
-        This loss assumes that zeros are used as padding on the target so that
-        the count can be derived from the number of non-zero elements.
-        """
-        loss = F.mse_loss(input, target, reduction="sum")
-        N = (target != 0.0).to(loss.dtype).sum()
-        loss = loss / N
-        return identity_loss(loss, reduction="none")
 
 
 

@@ -4,11 +4,11 @@
 ```
 conda install pytorch==1.9.0 cudatoolkit=11.1 -c pytorch -c conda-forge
 conda install pyg -c pyg
-conda install -c conda-forge tensorboard ase fair-research-login h5py tqdm
+conda install -c conda-forge tensorboard ase fair-research-login h5py tqdm gdown
 ```
 
 ## Data Preprocessing
-The HydroNet water cluster minima (`$ID='min'`)and QM9 (`$ID='qm9'`) datasets can be downloaded and preprocessed with the following call:
+The HydroNet water cluster minima (`$ID='min'`) and QM9 (`$ID='qm9'`) datasets can be downloaded and preprocessed with the following call:
 
 `python preprocess.py --sample $ID`
 
