@@ -1,6 +1,10 @@
 # Pytorch Geometric Implementation of SchNet
 
 ## Conda Environment
+
+#### Using pip with conda
+Not all packages are available with conda. To correctly direct a pip install in a conda environment, first `conda install pip`. Pip will install in your anaconda (or conda or miniconda) directory under the name of your environment (something like `/anaconda/envs/env_name/`). In all subsequent pip installs, replace `pip` with `/anaconda/envs/env_name/bin/pip`.
+
 #### Pytorch 1.9.0 with cuda 11.1
 ```
 conda install pytorch==1.9.0 cudatoolkit=11.1 -c pytorch -c conda-forge
