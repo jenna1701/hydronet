@@ -20,7 +20,7 @@ pip install setuptools==59.5.0
 #### Pytorch 1.12.0 with cuda 11.3
 ```
 conda install pytorch==1.12.0 cudatoolkit=11.3 -c pytorch -c conda-forge
-pip install torch-scatter torch-sparse torch-cluster torch-spline-conv torch-geometric -f https://data.pyg.org/whl/torch-1.12.0+cu113.html
+pip install torch-scatter torch-sparse torch-cluster torch-geometric -f https://data.pyg.org/whl/torch-1.12.0+cu113.html
 conda install -c conda-forge tensorboard ase fair-research-login h5py tqdm gdown
 ```
 
