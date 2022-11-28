@@ -1,6 +1,7 @@
 import os
 import os.path as op
 from torch_geometric.data import DataListLoader, DataLoader
+#from torch_geometric.loader import DataListLoader, DataLoader
 from torch.utils.data import ConcatDataset
 from utils.datasets import PrepackedDataset
 import sys
@@ -44,7 +45,9 @@ def test_dataloader(args,
                     split = '00'
                     ):
 
-    dataset = PrepackedDataset(None, op.join(args.savedir,f'split_{split}_{dataset}.npz'), dataset, 
+    dataset = PrepackedDataset(None,
+                               op.join(args.savedir,f'split_{split}_{dataset}.npz'),
+                               dataset,
                                directory=args.datadir)
     data = dataset.load_data('test')
     

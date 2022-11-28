@@ -44,6 +44,9 @@ def load_pretrained_model(args, device='cpu', frozen=False):
     
     # load state dict of trained model
     state=torch.load(args.start_model)
+
+    # remove module. from statedict keys (artifact of parallel gpu training)
+    state = {k.replace('module.',''):v for k,v in state.items()}
     
     # extract model params from model state dict
     num_gaussians = state['basis_expansion.offset'].shape[0]
