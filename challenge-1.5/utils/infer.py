@@ -63,13 +63,13 @@ def infer(loader, net, forces=True, energies=True, force_type='max', device='cpu
                 
     # return as dataframe
     if energies == True and forces == False:
-        return pd.DataFrame({'cluster_size': size, 'e_actual': e_actual, 'e_pred': e_pred})
+        return pd.DataFrame({'size': size, 'e_actual': e_actual, 'e_pred': e_pred})
     
     if energies == True and forces == True:
         if force_type=='error':
-            return pd.DataFrame({'cluster_size': size, 'e_actual': e_actual, 'e_pred': e_pred}), pd.DataFrame({'f_mag_error': f_actual, 'f_ang_error': f_pred})
+            return pd.DataFrame({'size': size, 'e_actual': e_actual, 'e_pred': e_pred}), pd.DataFrame({'f_mag_error': f_actual, 'f_ang_error': f_pred})
         else:
-            return pd.DataFrame({'cluster_size': size, 'e_actual': e_actual, 'e_pred': e_pred}), pd.DataFrame({'f_actual': f_actual, 'f_pred': f_pred})
+            return pd.DataFrame({'size': size, 'e_actual': e_actual, 'e_pred': e_pred}), pd.DataFrame({'f_actual': f_actual, 'f_pred': f_pred})
 
         
 def infer_with_error(loader, net):
@@ -110,7 +110,7 @@ def infer_with_error(loader, net):
         e_pred += e.tolist()
 
 
-    return pd.DataFrame({'cluster_size': size,
+    return pd.DataFrame({'size': size,
                          'e_actual': e_actual, 'e_pred': e_pred,
                          'fme_mae': fme_mae, 'fae_mae': fae_mae,
                          'fme_mse': fme_mse, 'fae_mse': fae_mse})

@@ -28,7 +28,7 @@ conda install -c conda-forge tensorboard ase fair-research-login h5py tqdm gdown
 Note that installing `torch-spine-conv` will likely produce a GLIBC error. It is safe to `pip uninstall torch-spine-conv` if the error occurs.
 
 ## Data Preprocessing
-The HydroNet water cluster minima (`$ID='min'`) and QM9 (`$ID='qm9'`) datasets can be downloaded and preprocessed with the following call:
+The HydroNet water cluster minima (`ID='min'`) and QM9 (`ID='qm9'`) datasets can be downloaded and preprocessed with the following call:
 
 `python preprocess.py --sample $ID`
 
@@ -62,3 +62,10 @@ Set training arguments in `train_args.json`:
 Training is run with the following call:
 
 `python train_direct.py --savedir './test_train' --args 'train_args.json'`
+
+## Inference
+Inference on the test set is run with the following call:
+
+`python test_set_errors.py --savedir './test_train'`
+
+A csv will be saved as `test_set_inference.csv` with the actual and predicted properties for each sample.
