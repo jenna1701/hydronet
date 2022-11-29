@@ -82,7 +82,7 @@ def infer_with_error(loader, net):
     for data in loader:
         # extract ground truth values
         e_actual += data.y.tolist()
-        size += data.size.tolist()
+        size += data['size'].tolist()
 
         # get predicted values
         data.pos.requires_grad = True
@@ -92,7 +92,7 @@ def infer_with_error(loader, net):
         # reshape f to ragged tensor
         # compute f errors for each sample
         start = 0
-        for dsize in data.size.numpy()*3:
+        for dsize in data['size'].numpy()*3:
             f_ragged = f[start:start+dsize]
             f_act = data.f[start:start+dsize]
 

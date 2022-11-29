@@ -21,6 +21,7 @@ with open(op.join(args.savedir, 'args.json')) as f:
 args.savedir = savedir
 args.load_state = True
 args.load_model = True
+args.start_model = op.join(args.savedir, 'best_model.pt')
 
 # check for GPU
 device = 'cuda' if torch.cuda.is_available() else 'cpu'

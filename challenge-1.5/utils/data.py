@@ -50,6 +50,7 @@ def test_dataloader(args,
                                dataset,
                                directory=args.datadir)
     data = dataset.load_data('test')
+    print(f"{len(data)} samples in test set")
     
     batch_size = args.batch_size if len(data) > args.batch_size else len(data)
     loader = DataLoader(data, batch_size=batch_size, shuffle=False)
