@@ -20,6 +20,8 @@ from utils import data_ddp, models, train, train_ddp, models_ddp, eval, split, h
 
 # def init_setup(args):
 def main(args):
+    # os.environ["TORCH_CPP_LOG_LEVEL"]="INFO"
+    # os.environ["TORCH_DISTRIBUTED_DEBUG"] = "DETAIL"  # set to DETAIL for runtime logging.
     dist.init_process_group(backend="nccl", init_method='env://')
     rank = int(os.environ["LOCAL_RANK"])  # dist.get_rank()
     print(f"Start running SchNet on rank {rank}.")
@@ -67,10 +69,10 @@ def main(args):
     logging.info(f'model will be trained on {device}')
 
     # increase batch size based on the number of GPUs
-    if device == 'cuda' and args.parallel:
-        n_gpus = torch.cuda.device_count()
-        args.batch_size = int(n_gpus * args.batch_size)
-        logging.info(f'... {n_gpus} found, multipying batch size accordingly (batch size now {args.batch_size})')
+    # if device == 'cuda' and args.parallel:
+    #     n_gpus = torch.cuda.device_count()
+    #     args.batch_size = int(n_gpus * args.batch_size)
+    #     logging.info(f'... {n_gpus} found, multipying batch size accordingly (batch size now {args.batch_size})')
 
 #    return
 
