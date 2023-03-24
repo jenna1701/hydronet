@@ -29,8 +29,7 @@ from multiprocessing import Pool
 class PrepackedDataset(torch.utils.data.Dataset):
     def __init__(self, loader_list, split_file, dataset_type, 
                  max_num_atoms=None, num_elements=None,
-                 shuffle=True, mode="train", directory="./data/cached_dataset/",
-                 N=12):
+                 shuffle=True, mode="train", directory="./data/cached_dataset/"):
         
         self.dataset = []
         self.shuffle = shuffle
@@ -40,7 +39,6 @@ class PrepackedDataset(torch.utils.data.Dataset):
         self.dataset_type = dataset_type
         self.max_num_atoms = max_num_atoms
         self.num_elements = num_elements
-        self.N = N
 
         if not os.path.exists(directory):
             os.makedirs(directory)
@@ -102,7 +100,7 @@ class PrepackedDataset(torch.utils.data.Dataset):
         
         return data_list
 
-    def load_data_parallel(self, idx_type):
+    def load_data_parallel(self, idx_type, N=12):
         # load split file
         S = np.load(self.split_file)
         mode_idx = S[f'{idx_type}_idx']
@@ -120,7 +118,7 @@ class PrepackedDataset(torch.utils.data.Dataset):
             data = Data(x=x, z=z, pos=pos, y=y, size=size)
             return data
 
-        with Pool(self.N) as p:
+        with Pool(N) as p:
             data_list = p.map(_loader, mode_idx)
 
         return data_list
