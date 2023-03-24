@@ -24,11 +24,13 @@ from ase.units import Debye, Bohr, Hartree, eV
 from ase.db import connect
 import shutil
 import fair_research_login
+from multiprocessing import Pool
 
 class PrepackedDataset(torch.utils.data.Dataset):
     def __init__(self, loader_list, split_file, dataset_type, 
                  max_num_atoms=None, num_elements=None,
-                 shuffle=True, mode="train", directory="./data/cached_dataset/"):
+                 shuffle=True, mode="train", directory="./data/cached_dataset/",
+                 N=12):
         
         self.dataset = []
         self.shuffle = shuffle
@@ -81,11 +83,11 @@ class PrepackedDataset(torch.utils.data.Dataset):
         dataset = h5py.File(os.path.join(self.directory, f"{self.dataset_type}.hdf5"), "r")
 
         S = np.load(self.split_file)
-        self.mode_idx = S[f'{idx_type}_idx']
+        mode_idx = S[f'{idx_type}_idx']
 
         data_list = []
-        for i in range(len(self.mode_idx)):
-            index = self.mode_idx[i]
+        for i in range(len(mode_idx)):
+            index = mode_idx[i]
             cluster_size = dataset["size"][index][0]
             
             z = torch.from_numpy(dataset["z"][index][:cluster_size])
@@ -98,6 +100,30 @@ class PrepackedDataset(torch.utils.data.Dataset):
             data_list.append(data)
         
         return data_list
+
+    def load_data_parallel(self, idx_type):
+        # load split file
+        S = np.load(self.split_file)
+        mode_idx = S[f'{idx_type}_idx']
+
+        def _loader(index, db=os.path.join(self.directory, f"{self.dataset_type}.hdf5")):
+            dataset = h5py.File(db, "r")
+            cluster_size = dataset["size"][index][0]
+
+            z = torch.from_numpy(dataset["z"][index][:cluster_size])
+            x = torch.from_numpy(dataset["x"][index][:cluster_size])
+            pos = torch.from_numpy(dataset["pos"][index][:cluster_size])
+            pos.requires_grad = True
+            y = torch.from_numpy(dataset["y"][index])
+            size = torch.from_numpy(dataset["size"][index])
+            data = Data(x=x, z=z, pos=pos, y=y, size=size)
+            return data
+
+        with Pool(self.N) as p:
+            data_list = p.map(_loader, mode_idx)
+
+        return data_list
+
 
     def __len__(self):
         return len(self.z)
@@ -436,7 +462,11 @@ class QM9DataSet(InMemoryDataset):
                 row = conn.get(id=i+1)
                 name = ['energy_U']
                 mol = row.toatoms()
-                y = torch.tensor(row.data[name[0]], dtype=torch.float) #potential energy
+
+                # energy_U 
+                y = torch.tensor(row.data[name[0]], dtype=torch.float)
+
+
                 if center:
                     pos = mol.get_positions() - mol.get_center_of_mass()
                 else:
