@@ -40,6 +40,7 @@ class PrepackedDataset(torch.utils.data.Dataset):
         self.dataset_type = dataset_type
         self.max_num_atoms = max_num_atoms
         self.num_elements = num_elements
+        self.N = N
 
         if not os.path.exists(directory):
             os.makedirs(directory)
